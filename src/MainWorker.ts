@@ -1,6 +1,10 @@
-import serializeError = require("serialize-error");
+import { serializeError } from "serialize-error";
 
-import {parse, stringify, ArrayBufferViewWithPromise} from "./serializeBinary";
+import {
+  parse,
+  stringify,
+  ArrayBufferViewWithPromise,
+} from "./serializeBinary";
 
 const SUBTLE_METHODS = [
   "encrypt",
@@ -14,7 +18,7 @@ const SUBTLE_METHODS = [
   "importKey",
   "exportKey",
   "wrapKey",
-  "unwrapKey"
+  "unwrapKey",
 ];
 
 /*
@@ -54,21 +58,24 @@ export default class MainWorker {
   // we are working on
   private messages: {
     [id: string]: {
-      resolve: (value: any ) => void
-      reject: (reason: any) => void
-    }
+      resolve: (value: any) => void;
+      reject: (reason: any) => void;
+    };
   } = {};
 
   // sendToWebView should take a string and send that message to the webview
-  constructor(private sendToWebView: (message: string) => void, private debug = false) {}
+  constructor(
+    private sendToWebView: (message: string) => void,
+    private debug = false
+  ) {}
 
   get crypto(): Crypto {
     const callMethod = this.callMethod;
-    return ({
+    return {
       subtle: this.subtle,
       getRandomValues: this.getRandomValues.bind(this),
-      fake: true
-    } as any);
+      fake: true,
+    } as any;
   }
 
   private get subtle(): SubtleCrypto {
@@ -81,7 +88,9 @@ export default class MainWorker {
     return s as SubtleCrypto;
   }
 
-  private getRandomValues (array: ArrayBufferViewWithPromise): ArrayBufferViewWithPromise {
+  private getRandomValues(
+    array: ArrayBufferViewWithPromise
+  ): ArrayBufferViewWithPromise {
     const promise = this.callMethod("getRandomValues", [array], false);
 
     // make the _promise not enumerable so it isn't JSON stringified,
@@ -90,7 +99,7 @@ export default class MainWorker {
       value: promise,
       configurable: true,
       enumerable: false,
-      writable: true
+      writable: true,
     });
 
     promise.then((updatedArray: ArrayBufferView) => {
@@ -99,58 +108,77 @@ export default class MainWorker {
     return array;
   }
 
-  onWebViewMessage (message): void {
+  onWebViewMessage(message): void {
     // first message just tells us the webview is ready
     if (!this.readyToSend) {
       if (this.debug) {
         console.log("[webview-crypto] Got first message; ready to send");
-      };
+      }
       this.readyToSend = true;
       for (let m of this.toSend) {
         this.sendToWebView(m);
       }
       return;
     }
-    parse(message).then(({id, value, reason}) => {
-      if (this.debug) {
-        console.log("[webview-crypto] Received message:", JSON.stringify({
-          id,
-          value,
-          reason
-        }));
-      };
-      if (!id) {
-        console.warn("[webview-crypto] no ID passed back from message:", JSON.stringify(serializeError(reason)));
-        return;
-      }
-      const {resolve, reject} = this.messages[id];
-      if (!reason) {
-        resolve(value);
-      } else {
-        reject(reason);
-      }
-      delete this.messages[id];
-    }).catch((reason) => {
-      console.warn("[webview-crypto] error in `parse` of message:", JSON.stringify(message), "reason:", JSON.stringify(serializeError(reason)));
-    });
+    parse(message)
+      .then(({ id, value, reason }) => {
+        if (this.debug) {
+          console.log(
+            "[webview-crypto] Received message:",
+            JSON.stringify({
+              id,
+              value,
+              reason,
+            })
+          );
+        }
+        if (!id) {
+          console.warn(
+            "[webview-crypto] no ID passed back from message:",
+            JSON.stringify(serializeError(reason))
+          );
+          return;
+        }
+        const { resolve, reject } = this.messages[id];
+        if (!reason) {
+          resolve(value);
+        } else {
+          reject(reason);
+        }
+        delete this.messages[id];
+      })
+      .catch((reason) => {
+        console.warn(
+          "[webview-crypto] error in `parse` of message:",
+          JSON.stringify(message),
+          "reason:",
+          JSON.stringify(serializeError(reason))
+        );
+      });
   }
 
-
-  private callMethod (method: string, args: any[], waitForArrayBufferView: boolean): Promise<any> {
+  private callMethod(
+    method: string,
+    args: any[],
+    waitForArrayBufferView: boolean
+  ): Promise<any> {
     const id = MainWorker.uuid();
     // store this promise, so we can resolve it when we get a message
     // back from the web view
     const promise = new Promise((resolve, reject) => {
-      this.messages[id] = {resolve, reject};
+      this.messages[id] = { resolve, reject };
     });
-    const payloadObject = {method, id, args};
+    const payloadObject = { method, id, args };
     if (this.debug) {
-      console.log("[webview-crypto] Sending message:", JSON.stringify({
-        method,
-        args,
-        payloadObject
-      }));
-    };
+      console.log(
+        "[webview-crypto] Sending message:",
+        JSON.stringify({
+          method,
+          args,
+          payloadObject,
+        })
+      );
+    }
     stringify(payloadObject, waitForArrayBufferView)
       .then((message) => {
         if (this.readyToSend) {
@@ -162,7 +190,7 @@ export default class MainWorker {
       .catch((reason) => {
         this.messages[id].reject({
           message: `exception in stringify-ing message: ${method} ${id}`,
-          reason
+          reason,
         });
         delete this.messages[id];
       });

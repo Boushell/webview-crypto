@@ -1,4 +1,4 @@
-import find = require("lodash/find");
+import find from "lodash/find";
 
 export interface Serializer<T, S> {
   id: string;
@@ -13,20 +13,23 @@ interface Serialized {
 }
 
 function isSerialized(object: any): object is Serialized {
-    return object.hasOwnProperty("__serializer_id");
+  return object.hasOwnProperty("__serializer_id");
 }
 
-export async function toObjects(serializers: Serializer<any, any>[], o: any): Promise<any> {
+export async function toObjects(
+  serializers: Serializer<any, any>[],
+  o: any
+): Promise<any> {
   if (typeof o !== "object") {
     return o;
   }
 
-  const serializer = find(serializers, s => s.isType(o));
+  const serializer = find(serializers, (s) => s.isType(o));
   if (serializer) {
     const value = serializer.toObject ? await serializer.toObject(o) : o;
     return {
       __serializer_id: serializer.id,
-      value: await toObjects(serializers, value)
+      value: await toObjects(serializers, value),
     } as Serialized;
   }
 
@@ -37,7 +40,10 @@ export async function toObjects(serializers: Serializer<any, any>[], o: any): Pr
   return newO;
 }
 
-export async function fromObjects(serializers: Serializer<any, any>[], o: any): Promise<any> {
+export async function fromObjects(
+  serializers: Serializer<any, any>[],
+  o: any
+): Promise<any> {
   if (typeof o !== "object") {
     return o;
   }
